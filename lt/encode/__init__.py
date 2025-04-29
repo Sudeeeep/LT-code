@@ -32,12 +32,15 @@ def encoder(f, blocksize, seed=None, c=sampler.DEFAULT_C, delta=sampler.DEFAULT_
     prng.set_seed(seed)
 
     # block generation loop
+    count = 0
     while True:
         blockseed, d, ix_samples = prng.get_src_blocks()
         block_data = 0
         for ix in ix_samples:
             block_data ^= blocks[ix]
 
+        count += 1
+        # print(f"[Encoder] Emitted symbol #{count} — degree: {d} — indices: {sorted(ix_samples)}", file=sys.stderr)
         # Generate blocks of XORed data in network byte order
         block = (filesize, blocksize, blockseed, int.to_bytes(block_data, blocksize, sys.byteorder))
         yield pack('!III%ss'%blocksize, *block)

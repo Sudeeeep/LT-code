@@ -67,6 +67,7 @@ class BlockGraph(object):
 
         # Cache resolved value
         self.eliminated[node] = data
+        print(f"[Decoder] Solved block {node}!", file=sys.stderr)
         others = self.checks[node]
         del self.checks[node]
 
@@ -97,9 +98,17 @@ class LtDecoder(object):
 
     def consume_block(self, lt_block):
         (filesize, blocksize, blockseed), block = lt_block
+        # print(f"[Decoder] Received symbol with seed {blockseed}", file=sys.stderr)
+        self.received_count = getattr(self, "received_count", 0) + 1
 
         # first time around, init things
         if not self.initialized:
+            print(f"[Decoder] Starting decode session", file=sys.stderr)
+            sys.stderr.flush()
+
+            # print(f"[Decoder] File size: {filesize} bytes | Block size: {blocksize} bytes | Total blocks: {self.K}", file=sys.stderr)
+            # sys.stderr.flush()
+
             self.filesize = filesize
             self.blocksize = blocksize
 
@@ -107,12 +116,22 @@ class LtDecoder(object):
             self.block_graph = BlockGraph(self.K)
             self.prng = sampler.PRNG(params=(self.K, self.delta, self.c))
             self.initialized = True
+            print(f"[Decoder] File size: {filesize} bytes | Block size: {blocksize} bytes | Total blocks: {self.K}", file=sys.stderr)
+            sys.stderr.flush()
+
 
         # Run PRNG with given seed to figure out which blocks were XORed to make received data
         _, _, src_blocks = self.prng.get_src_blocks(seed=blockseed)
+        print(f"[Decoder] Received symbol with seed {blockseed} — depends on blocks: {sorted(src_blocks)}", file=sys.stderr)
+        sys.stderr.flush()
+
 
         # If BP is done, stop
         self.done = self._handle_block(src_blocks, block)
+        if self.done:
+                print(f"[Decoder] ✅ Decoding complete after receiving {self.received_count} symbols", file=sys.stderr)
+                sys.stderr.flush()
+
         return self.done
 
     def bytes_dump(self):
