@@ -25,6 +25,8 @@ def encoder(f, blocksize, seed=None, c=sampler.DEFAULT_C, delta=sampler.DEFAULT_
 
     # get file blocks
     filesize, blocks = _split_file(f, blocksize)
+    print(f"File size: {filesize}")
+    print(f"Number of blocks: {len(blocks)}")
 
     # init stream vars
     K = len(blocks)
