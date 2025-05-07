@@ -92,6 +92,7 @@ class LtDecoder(object):
         self.block_graph = None
         self.prng = None
         self.initialized = False
+        self.done = False
 
     def is_done(self):
         return self.done
@@ -104,11 +105,6 @@ class LtDecoder(object):
         # first time around, init things
         if not self.initialized:
             print(f"[Decoder] Starting decode session", file=sys.stderr)
-            sys.stderr.flush()
-
-            # print(f"[Decoder] File size: {filesize} bytes | Block size: {blocksize} bytes | Total blocks: {self.K}", file=sys.stderr)
-            # sys.stderr.flush()
-
             self.filesize = filesize
             self.blocksize = blocksize
 
@@ -117,20 +113,17 @@ class LtDecoder(object):
             self.prng = sampler.PRNG(params=(self.K, self.delta, self.c))
             self.initialized = True
             print(f"[Decoder] File size: {filesize} bytes | Block size: {blocksize} bytes | Total blocks: {self.K}", file=sys.stderr)
-            sys.stderr.flush()
 
 
         # Run PRNG with given seed to figure out which blocks were XORed to make received data
         _, _, src_blocks = self.prng.get_src_blocks(seed=blockseed)
         print(f"[Decoder] Received symbol with seed {blockseed} — depends on blocks: {sorted(src_blocks)}", file=sys.stderr)
-        sys.stderr.flush()
 
 
         # If BP is done, stop
         self.done = self._handle_block(src_blocks, block)
         if self.done:
                 print(f"[Decoder] ✅ Decoding complete after receiving {self.received_count} symbols", file=sys.stderr)
-                sys.stderr.flush()
 
         return self.done
 
