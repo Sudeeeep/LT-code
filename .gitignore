@@ -62,3 +62,6 @@ target/
 *.txt
 *.png
 *.csv
+*.jpg
+*.mp4
+*.avi
