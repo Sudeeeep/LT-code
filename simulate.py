@@ -9,6 +9,7 @@ from pymobility.models.mobility import random_waypoint
 
 from lt.encode import encoder as lt_encoder
 from lt.decode import LtDecoder, block_from_bytes
+import tkinter as tk
 
 
 input_video_path = "input_video.mp4"
@@ -24,6 +25,23 @@ os.makedirs(frame_dump_dir, exist_ok=True)
 simulation_time_step = 0.1        
 uav_speed = 5               
 bitrate_Mbps = 6            
+
+window = tk.Tk()
+window.title("UAV Simulation")
+canvas = tk.Canvas(window, width=500, height=500, bg="white")
+canvas.pack()
+ 
+bx, by = receiver_position
+canvas.create_rectangle(bx-10, by-10, bx+10, by+10, fill="blue", tags="base")
+
+
+def update_uav_on_canvas(x, y):
+    canvas.create_oval(x-1, y-1, x+1, y+1, fill="gray", outline="gray", tags="trail")
+
+    canvas.delete("uav")
+    canvas.create_oval(x-6, y-6, x+6, y+6, fill="red", tags="uav")
+
+    canvas.update()
 
 
 def compute_distance(pos1, pos2):
@@ -74,6 +92,8 @@ def simulate_frame_transmission(frame_data, trace, symbols_per_step):
     start_time = time.time()
 
     for pos_index, position in enumerate(trace):
+        print("current position:", position)
+        update_uav_on_canvas(*position)
         if decoder.is_done():
             break
         distance = compute_distance(position, receiver_position)
@@ -100,6 +120,7 @@ def simulate_frame_transmission(frame_data, trace, symbols_per_step):
     effective_rate = round(K / symbols_received, 4) if symbols_received > 0 else 0
 
     if decoder.is_done():
+        print("position after decoding:", position)
         return decoder.bytes_dump(), symbols_sent, latency, avg_distance, effective_rate
     else:
         return None, symbols_sent, latency, avg_distance, effective_rate
@@ -142,6 +163,9 @@ def run_video_simulation():
         model = random_waypoint(nr_nodes=1, dimensions=trace_area, velocity=velocity)
         trace = generate_interpolated_trace(model, max_trace_steps, simulation_time_step, uav_speed)
 
+        print("start co-ordinate: ", trace[0])
+        print("end co-ordinate: ", trace[len(trace) - 1])
+
         decoded_data, symbols, latency, avg_distance, eff_rate = simulate_frame_transmission(
             frame_bytes, trace, symbols_per_step)
 
@@ -178,3 +202,4 @@ def run_video_simulation():
 
 if __name__ == "__main__":
     run_video_simulation()
+    window.mainloop()
