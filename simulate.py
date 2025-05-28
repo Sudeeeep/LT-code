@@ -143,6 +143,16 @@ def run_video_simulation():
     metrics = [("frame_id", "symbols_needed", "latency_sec", "throughput_Mbps", "avg_distance", "effective_rate")]
     frame_count = 0
 
+    model = random_waypoint(nr_nodes=1, dimensions=trace_area, velocity=velocity)
+    initial_position = next(model)[0]
+
+    def continue_trace_from(pos):
+        def new_model():
+            yield (pos,)
+            while True:
+                yield next(model)
+        return new_model()
+
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -160,8 +170,8 @@ def run_video_simulation():
         max_symbols = int(4.0 * K)
         max_trace_steps = max_symbols // symbols_per_step + 1
 
-        model = random_waypoint(nr_nodes=1, dimensions=trace_area, velocity=velocity)
-        trace = generate_interpolated_trace(model, max_trace_steps, simulation_time_step, uav_speed)
+        model_with_start = continue_trace_from(initial_position)
+        trace = generate_interpolated_trace(model_with_start, max_trace_steps, simulation_time_step, uav_speed)
 
         print("start co-ordinate: ", trace[0])
         print("end co-ordinate: ", trace[len(trace) - 1])
@@ -188,6 +198,8 @@ def run_video_simulation():
               f"Throughput: {throughput:.2f} Mbps, Avg Distance: {avg_distance}, Effective Rate: {eff_rate}")
         frame_count += 1
 
+        initial_position = trace[-1]
+        
     cap.release()
     out.release()
 
