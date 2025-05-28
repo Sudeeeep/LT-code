@@ -54,10 +54,9 @@ def loss_rate(distance, max_range=300):
         return 0.98
     return min(0.1 + 0.002 * distance, 0.9)
 
-def generate_interpolated_trace(model, max_steps, time_step, speed_mps):
+def generate_interpolated_trace(model, start_position, max_steps, time_step, speed_mps):
     trace = []
-    current_pos = next(model)[0]
-
+    current_pos = start_position
     while len(trace) < max_steps:
         target_pos = next(model)[0]
         dx = target_pos[0] - current_pos[0]
@@ -121,9 +120,9 @@ def simulate_frame_transmission(frame_data, trace, symbols_per_step):
 
     if decoder.is_done():
         print("position after decoding:", position)
-        return decoder.bytes_dump(), symbols_sent, latency, avg_distance, effective_rate
+        return decoder.bytes_dump(), symbols_sent, latency, avg_distance, effective_rate, position
     else:
-        return None, symbols_sent, latency, avg_distance, effective_rate
+        return None, symbols_sent, latency, avg_distance, effective_rate, trace[-1]
 
 
 def run_video_simulation():
@@ -144,7 +143,7 @@ def run_video_simulation():
     frame_count = 0
 
     model = random_waypoint(nr_nodes=1, dimensions=trace_area, velocity=velocity)
-    initial_position = next(model)[0]
+    current_position = next(model)[0]
 
     def continue_trace_from(pos):
         def new_model():
@@ -170,13 +169,12 @@ def run_video_simulation():
         max_symbols = int(4.0 * K)
         max_trace_steps = max_symbols // symbols_per_step + 1
 
-        model_with_start = continue_trace_from(initial_position)
-        trace = generate_interpolated_trace(model_with_start, max_trace_steps, simulation_time_step, uav_speed)
+        trace = generate_interpolated_trace(model, current_position, max_trace_steps, simulation_time_step, uav_speed)
 
         print("start co-ordinate: ", trace[0])
         print("end co-ordinate: ", trace[len(trace) - 1])
 
-        decoded_data, symbols, latency, avg_distance, eff_rate = simulate_frame_transmission(
+        decoded_data, symbols, latency, avg_distance, eff_rate, current_position = simulate_frame_transmission(
             frame_bytes, trace, symbols_per_step)
 
         latency = max(latency, 1e-6) 
@@ -197,8 +195,6 @@ def run_video_simulation():
         print(f"Frame {frame_count} → Symbols: {symbols}, Latency: {latency:.6f}s, "
               f"Throughput: {throughput:.2f} Mbps, Avg Distance: {avg_distance}, Effective Rate: {eff_rate}")
         frame_count += 1
-
-        initial_position = trace[-1]
         
     cap.release()
     out.release()
