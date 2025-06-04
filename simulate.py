@@ -10,6 +10,7 @@ from pymobility.models.mobility import random_waypoint
 from lt.encode import encoder as lt_encoder
 from lt.decode import LtDecoder, block_from_bytes
 import tkinter as tk
+from collections import defaultdict
 
 
 input_video_path = "input_video.mp4"
@@ -24,7 +25,8 @@ os.makedirs(frame_dump_dir, exist_ok=True)
 
 simulation_time_step = 0.1        
 uav_speed = 5               
-bitrate_Mbps = 6            
+trials = 10         
+bitrate_Mbps = 6
 
 window = tk.Tk()
 window.title("UAV Simulation")
@@ -49,7 +51,7 @@ def compute_distance(pos1, pos2):
     x2, y2 = pos2
     return ((x1 - x2)**2 + (y1 - y2)**2) ** 0.5
 
-def loss_rate(distance, max_range=300):
+def loss_rate(distance, max_range=500):
     if distance >= max_range:
         return 0.98
     return min(0.1 + 0.002 * distance, 0.9)
@@ -125,7 +127,7 @@ def simulate_frame_transmission(frame_data, trace, symbols_per_step):
         return None, symbols_sent, latency, avg_distance, effective_rate, trace[-1]
 
 
-def run_video_simulation():
+def run_video_simulation(accumulated_metrics):
     cap = cv2.VideoCapture(input_video_path)
     if not cap.isOpened():
         print("Cannot open video file.")
@@ -134,23 +136,12 @@ def run_video_simulation():
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
-
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
 
-    
-    metrics = [("frame_id", "symbols_needed", "latency_sec", "throughput_Mbps", "avg_distance", "effective_rate")]
     frame_count = 0
-
     model = random_waypoint(nr_nodes=1, dimensions=trace_area, velocity=velocity)
     current_position = next(model)[0]
-
-    def continue_trace_from(pos):
-        def new_model():
-            yield (pos,)
-            while True:
-                yield next(model)
-        return new_model()
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -159,7 +150,6 @@ def run_video_simulation():
 
         _, compressed = cv2.imencode('.jpg', frame)
         frame_bytes = compressed.tobytes()
-
         bits_per_sec = bitrate_Mbps * 1_000_000
         bits_per_symbol = block_size * 8
         symbols_per_sec = bits_per_sec / bits_per_symbol
@@ -168,17 +158,24 @@ def run_video_simulation():
         K = len(frame_bytes) // block_size + 1
         max_symbols = int(4.0 * K)
         max_trace_steps = max_symbols // symbols_per_step + 1
-
         trace = generate_interpolated_trace(model, current_position, max_trace_steps, simulation_time_step, uav_speed)
-
-        print("start co-ordinate: ", trace[0])
-        print("end co-ordinate: ", trace[len(trace) - 1])
 
         decoded_data, symbols, latency, avg_distance, eff_rate, current_position = simulate_frame_transmission(
             frame_bytes, trace, symbols_per_step)
 
-        latency = max(latency, 1e-6) 
-        throughput = (len(frame_bytes) * 8) / (latency * 1_000_000) if latency > 0 else 0
+        latency = max(latency, 1e-6)
+        throughput = (len(frame_bytes) * 8) / (latency * 1_000_000)
+
+        if latency > 0.01 and throughput < 1000:
+            accumulated_metrics["symbols_needed"][frame_count] += symbols
+            accumulated_metrics["latency_sec"][frame_count] += latency
+            accumulated_metrics["throughput_Mbps"][frame_count] += throughput
+            accumulated_metrics["avg_distance"][frame_count] += avg_distance
+            accumulated_metrics["effective_rate"][frame_count] += eff_rate
+        else:
+            accumulated_metrics["symbols_needed"][frame_count] += symbols
+            accumulated_metrics["avg_distance"][frame_count] += avg_distance
+            accumulated_metrics["effective_rate"][frame_count] += eff_rate
 
         if decoded_data:
             decoded_img = cv2.imdecode(np.frombuffer(decoded_data, dtype=np.uint8), cv2.IMREAD_COLOR)
@@ -190,24 +187,38 @@ def run_video_simulation():
         else:
             print(f"Skipped frame {frame_count}: LT decoding failed entirely")
 
-        
-        metrics.append((frame_count, symbols, round(latency, 6), round(throughput, 2), avg_distance, eff_rate))
         print(f"Frame {frame_count} → Symbols: {symbols}, Latency: {latency:.6f}s, "
               f"Throughput: {throughput:.2f} Mbps, Avg Distance: {avg_distance}, Effective Rate: {eff_rate}")
         frame_count += 1
-        
+
     cap.release()
     out.release()
 
+def run_multiple_trials():
+    metrics_dict = defaultdict(lambda: defaultdict(float))
+
+    for trial in range(trials):
+        print(f"\n----- TRIAL {trial + 1} -----")
+        run_video_simulation(metrics_dict)
+
+    frame_ids = sorted(metrics_dict["latency_sec"].keys())
     with open(output_csv, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerows(metrics)
+        writer.writerow(["frame_id", "symbols_needed", "latency_sec", "throughput_Mbps", "avg_distance", "effective_rate"])
+        for fid in frame_ids:
+            row = [
+                fid,
+                round(metrics_dict["symbols_needed"][fid] / trials, 2),
+                round(metrics_dict["latency_sec"][fid] / trials, 6),
+                round(metrics_dict["throughput_Mbps"][fid] / trials, 2),
+                round(metrics_dict["avg_distance"][fid] / trials, 2),
+                round(metrics_dict["effective_rate"][fid] / trials, 4)
+            ]
+            writer.writerow(row)
 
-    print(f"\nSimulation complete. Output saved to {output_video_path}")
-    print(f"Metrics saved to {output_csv}")
-    print(f"Individual decoded frames saved to ./{frame_dump_dir}/")
+    print(f"\nAll {trials} trials complete. Averaged metrics saved to {output_csv}")
 
 
 if __name__ == "__main__":
-    run_video_simulation()
+    run_multiple_trials()
     window.mainloop()
