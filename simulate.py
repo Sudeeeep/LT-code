@@ -13,7 +13,7 @@ import tkinter as tk
 from collections import defaultdict
 
 
-input_video_path = "input_video.mp4"
+input_video_path = "input_video_10mb.mp4"
 output_video_path = "decoded_output.mp4"
 block_size = 32  
 trace_area = (500, 500)
@@ -25,7 +25,7 @@ os.makedirs(frame_dump_dir, exist_ok=True)
 
 simulation_time_step = 0.1        
 uav_speed = 5               
-trials = 10         
+trials = 20         
 bitrate_Mbps = 6
 
 window = tk.Tk()
@@ -117,8 +117,7 @@ def simulate_frame_transmission(frame_data, trace, symbols_per_step):
     latency = max(time.time() - start_time, 1e-6) 
     avg_distance = round(sum(distances) / len(distances), 2) if distances else 0
 
-   
-    effective_rate = round(K / symbols_received, 4) if symbols_received > 0 else 0
+    effective_rate = round(K / symbols_sent, 4)
 
     if decoder.is_done():
         print("position after decoding:", position)
