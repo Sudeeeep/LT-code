@@ -126,7 +126,7 @@ def simulate_frame_transmission(frame_data, trace, symbols_per_step):
         return None, symbols_sent, latency, avg_distance, effective_rate, trace[-1]
 
 
-def run_video_simulation(accumulated_metrics):
+def run_video_simulation(range_data):
     cap = cv2.VideoCapture(input_video_path)
     if not cap.isOpened():
         print("Cannot open video file.")
@@ -165,16 +165,15 @@ def run_video_simulation(accumulated_metrics):
         latency = max(latency, 1e-6)
         throughput = (len(frame_bytes) * 8) / (latency * 1_000_000)
 
+        range_mean = round((avg_distance // 10) * 10 + 5)
+
+        range_data[range_mean]["symbols_needed"].append(symbols)
+        range_data[range_mean]["effective_rate"].append(eff_rate)
+
         if latency > 0.01 and throughput < 1000:
-            accumulated_metrics["symbols_needed"][frame_count] += symbols
-            accumulated_metrics["latency_sec"][frame_count] += latency
-            accumulated_metrics["throughput_Mbps"][frame_count] += throughput
-            accumulated_metrics["avg_distance"][frame_count] += avg_distance
-            accumulated_metrics["effective_rate"][frame_count] += eff_rate
-        else:
-            accumulated_metrics["symbols_needed"][frame_count] += symbols
-            accumulated_metrics["avg_distance"][frame_count] += avg_distance
-            accumulated_metrics["effective_rate"][frame_count] += eff_rate
+            range_data[range_mean]["latency_sec"].append(latency)
+            range_data[range_mean]["throughput_Mbps"].append(throughput)
+
 
         if decoded_data:
             decoded_img = cv2.imdecode(np.frombuffer(decoded_data, dtype=np.uint8), cv2.IMREAD_COLOR)
@@ -194,26 +193,25 @@ def run_video_simulation(accumulated_metrics):
     out.release()
 
 def run_multiple_trials():
-    metrics_dict = defaultdict(lambda: defaultdict(float))
+    range_data = defaultdict(lambda: defaultdict(list))
 
     for trial in range(trials):
         print(f"\n----- TRIAL {trial + 1} -----")
-        run_video_simulation(metrics_dict)
+        run_video_simulation(range_data)
 
-    frame_ids = sorted(metrics_dict["latency_sec"].keys())
     with open(output_csv, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["frame_id", "symbols_needed", "latency_sec", "throughput_Mbps", "avg_distance", "effective_rate"])
-        for fid in frame_ids:
+        writer.writerow(["range_mean", "symbols_needed", "latency_sec", "throughput_Mbps", "effective_rate"])
+        for range_mean in sorted(range_data.keys()):
             row = [
-                fid,
-                round(metrics_dict["symbols_needed"][fid] / trials, 2),
-                round(metrics_dict["latency_sec"][fid] / trials, 6),
-                round(metrics_dict["throughput_Mbps"][fid] / trials, 2),
-                round(metrics_dict["avg_distance"][fid] / trials, 2),
-                round(metrics_dict["effective_rate"][fid] / trials, 4)
+                range_mean,
+                round(np.mean(range_data[range_mean]["symbols_needed"]), 2),
+                round(np.mean(range_data[range_mean]["latency_sec"]), 6),
+                round(np.mean(range_data[range_mean]["throughput_Mbps"]), 2),
+                round(np.mean(range_data[range_mean]["effective_rate"]), 4)
             ]
             writer.writerow(row)
+            print(f"Range {range_mean}m → Samples: {len(range_data[range_mean]['latency_sec'])}")
 
     print(f"\nAll {trials} trials complete. Averaged metrics saved to {output_csv}")
 
