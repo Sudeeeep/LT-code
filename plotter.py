@@ -14,7 +14,7 @@ def plot_metric(df, x_col, y_col, ylabel, color):
     plt.savefig(f"{ylabel}.png")
     plt.show()
 
-plot_metric(df, "bin_center", "symbols_needed", "Encoded Symbols Required", "tomato")
-plot_metric(df, "bin_center", "latency_sec", "Latency (seconds)", "blue")
-plot_metric(df, "bin_center", "throughput_Mbps", "Throughput (Mbps)", "green")
-plot_metric(df, "bin_center", "effective_rate", "Effective Rate", "purple")
+plot_metric(df, "range_mean", "symbols_needed", "Encoded Symbols Required", "tomato")
+plot_metric(df, "range_mean", "latency_sec", "Latency (seconds)", "blue")
+plot_metric(df, "range_mean", "throughput_Mbps", "Throughput (Mbps)", "green")
+plot_metric(df, "range_mean", "effective_rate", "Effective Rate", "purple")
