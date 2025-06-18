@@ -14,7 +14,7 @@ from collections import defaultdict
 
 
 input_video_path = "input_video_10mb.mp4"
-output_video_path = "decoded_output.mp4"
+output_video_path = "skip_frames_lowerqual_output_10mb.mp4"
 block_size = 32  
 trace_area = (500, 500)
 receiver_position = (250, 250)
@@ -147,7 +147,12 @@ def run_video_simulation(range_data):
         if not ret:
             break
 
-        _, compressed = cv2.imencode('.jpg', frame)
+        if frame_count % 5 != 0:
+            frame_count +=1
+            continue
+
+        # _, compressed = cv2.imencode('.jpg', frame)
+        _, compressed = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
         frame_bytes = compressed.tobytes()
         bits_per_sec = bitrate_Mbps * 1_000_000
         bits_per_symbol = block_size * 8
