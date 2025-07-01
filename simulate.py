@@ -6,15 +6,15 @@ import random
 import numpy as np
 import io
 from pymobility.models.mobility import random_waypoint
-
 from lt.encode import encoder as lt_encoder
 from lt.decode import LtDecoder, block_from_bytes
 import tkinter as tk
 from collections import defaultdict
+import av
 
 
-input_video_path = "input_video_10mb.mp4"
-output_video_path = "skip_frames_lowerqual_output_10mb.mp4"
+input_video_path = "output_hierarchical.mp4"
+output_video_path = "hierarchal_only_I_frames.mp4"
 block_size = 32  
 trace_area = (500, 500)
 receiver_position = (250, 250)
@@ -125,8 +125,31 @@ def simulate_frame_transmission(frame_data, trace, symbols_per_step):
     else:
         return None, symbols_sent, latency, avg_distance, effective_rate, trace[-1]
 
+def extract_frame_layers(video_path):
+    container = av.open(video_path)
+    frames_by_index = {}
+    frame_index = 0
+
+    for frame in container.decode(video=0):
+        pict_type = frame.pict_type
+        # print(pict_type)
+        if pict_type == 1 | pict_type == 2:
+            layer = 0
+        else:
+            layer = 1
+
+        frames_by_index[frame_index] = {
+            'type': pict_type,
+            'layer': layer
+        }
+        frame_index += 1
+
+    return frames_by_index
 
 def run_video_simulation(range_data):
+
+    frame_layer_map = extract_frame_layers(input_video_path)
+
     cap = cv2.VideoCapture(input_video_path)
     if not cap.isOpened():
         print("Cannot open video file.")
@@ -147,12 +170,11 @@ def run_video_simulation(range_data):
         if not ret:
             break
 
-        if frame_count % 5 != 0:
-            frame_count +=1
+        if frame_count not in frame_layer_map or frame_layer_map[frame_count]["layer"] > 0:
+            frame_count += 1
             continue
 
-        # _, compressed = cv2.imencode('.jpg', frame)
-        _, compressed = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+        _, compressed = cv2.imencode('.jpg', frame)
         frame_bytes = compressed.tobytes()
         bits_per_sec = bitrate_Mbps * 1_000_000
         bits_per_symbol = block_size * 8
