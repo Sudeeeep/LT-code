@@ -11,10 +11,11 @@ from lt.decode import LtDecoder, block_from_bytes
 import tkinter as tk
 from collections import defaultdict
 import av
+from encode_video import encode_multiple_res_video
 
 
-input_video_path = "output_hierarchical.mp4"
-output_video_path = "hierarchal_only_I_frames.mp4"
+input_video_path = "input_video_10mb.mp4"
+output_video_path = "output_adaptive.mp4"
 block_size = 32  
 trace_area = (500, 500)
 receiver_position = (250, 250)
@@ -125,52 +126,53 @@ def simulate_frame_transmission(frame_data, trace, symbols_per_step):
     else:
         return None, symbols_sent, latency, avg_distance, effective_rate, trace[-1]
 
-def extract_frame_layers(video_path):
-    container = av.open(video_path)
-    frames_by_index = {}
-    frame_index = 0
-
-    for frame in container.decode(video=0):
-        pict_type = frame.pict_type
-        # print(pict_type)
-        if pict_type == 1 | pict_type == 2:
-            layer = 0
-        else:
-            layer = 1
-
-        frames_by_index[frame_index] = {
-            'type': pict_type,
-            'layer': layer
-        }
-        frame_index += 1
-
-    return frames_by_index
-
 def run_video_simulation(range_data):
+    resolutions = ['144p', '360p', '480p', '720p']
+    resolution_caps = {}
+    for res in resolutions:
+        resolution_caps[res] = cv2.VideoCapture(os.path.join('res_videos', f'video_{res}.mp4'))
 
-    frame_layer_map = extract_frame_layers(input_video_path)
-
-    cap = cv2.VideoCapture(input_video_path)
-    if not cap.isOpened():
-        print("Cannot open video file.")
+    all_opened = True
+    for cap in resolution_caps.values():
+        if not cap.isOpened():
+            all_opened = False
+            break
+    if not all_opened:
+        print("video files couldn't be opened.")
         return
-
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
+    
+    fps = resolution_caps['720p'].get(cv2.CAP_PROP_FPS)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
-
+    out = None
+    prev_output_size = None
     frame_count = 0
     model = random_waypoint(nr_nodes=1, dimensions=trace_area, velocity=velocity)
     current_position = next(model)[0]
+    quality_index = 0
 
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
+    while True:
+        frames = {}
+        for res, cap in resolution_caps.items():
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_count)
+            ret, f = cap.read()
+            if not ret:
+                frames[res] = None
+            else:
+                frames[res] = f
+
+        all_ended = True
+        for f in frames.values():
+            if f is not None:
+                all_ended = False
+                break
+        if all_ended:
             break
 
-        if frame_count not in frame_layer_map or frame_layer_map[frame_count]["layer"] > 0:
+        selected_res = resolutions[quality_index]
+        frame = frames[selected_res]
+
+        if frame is None:
+            print(f"Frame {frame_count} not available in resolution {selected_res}")
             frame_count += 1
             continue
 
@@ -204,19 +206,33 @@ def run_video_simulation(range_data):
 
         if decoded_data:
             decoded_img = cv2.imdecode(np.frombuffer(decoded_data, dtype=np.uint8), cv2.IMREAD_COLOR)
-            if decoded_img is not None and decoded_img.shape[:2] == frame.shape[:2]:
+            if decoded_img is not None:
+                h, w = decoded_img.shape[:2]
+                if out is None or (w, h) != prev_output_size:
+                    if out is not None:
+                        out.release()
+                    out = cv2.VideoWriter(output_video_path, fourcc, fps, (w, h))
+                    prev_output_size = (w, h)
+
+                cv2.putText(decoded_img, selected_res, (10, 30),cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
                 out.write(decoded_img)
                 cv2.imwrite(os.path.join(frame_dump_dir, f"frame_{frame_count}.jpg"), decoded_img)
             else:
-                print(f"Skipped frame {frame_count}: image problem")
+                print(f"Skipped frame {frame_count}: decode frame size issue")
         else:
             print(f"Skipped frame {frame_count}: LT decoding failed entirely")
 
-        print(f"Frame {frame_count} → Symbols: {symbols}, Latency: {latency:.6f}s, "
+        if latency > 1 and quality_index > 0:
+            quality_index -= 1
+        elif latency < 0.4 and quality_index < len(resolutions) - 1:
+            quality_index += 1
+
+        print(f"Frame {frame_count} | {selected_res} → Symbols: {symbols}, Latency: {latency:.6f}s, "
               f"Throughput: {throughput:.2f} Mbps, Avg Distance: {avg_distance}, Effective Rate: {eff_rate}")
         frame_count += 1
 
-    cap.release()
+    for cap in resolution_caps.values():
+        cap.release()
     out.release()
 
 def run_multiple_trials():
@@ -244,5 +260,6 @@ def run_multiple_trials():
 
 
 if __name__ == "__main__":
+    encode_multiple_res_video(input_video_path, "res_videos/")
     run_multiple_trials()
     window.mainloop()
