@@ -222,9 +222,9 @@ def run_video_simulation(range_data):
         else:
             print(f"Skipped frame {frame_count}: LT decoding failed entirely")
 
-        if latency > 1 and quality_index > 0:
+        if latency > 0.8 and quality_index > 0:
             quality_index -= 1
-        elif latency < 0.4 and quality_index < len(resolutions) - 1:
+        elif latency < 0.3 and quality_index < len(resolutions) - 1:
             quality_index += 1
 
         print(f"Frame {frame_count} | {selected_res} → Symbols: {symbols}, Latency: {latency:.6f}s, "
