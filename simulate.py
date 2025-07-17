@@ -198,6 +198,7 @@ def run_video_simulation(range_data):
 
         range_data[range_mean]["symbols_needed"].append(symbols)
         range_data[range_mean]["effective_rate"].append(eff_rate)
+        range_data[range_mean]["resolution"].append(selected_res)
 
         if latency > 0.01 and throughput < 1000:
             range_data[range_mean]["latency_sec"].append(latency)
@@ -244,14 +245,15 @@ def run_multiple_trials():
 
     with open(output_csv, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["range_mean", "symbols_needed", "latency_sec", "throughput_Mbps", "effective_rate"])
+        writer.writerow(["range_mean", "symbols_needed", "latency_sec", "throughput_Mbps", "effective_rate", "resolution"])
         for range_mean in sorted(range_data.keys()):
             row = [
                 range_mean,
                 round(np.mean(range_data[range_mean]["symbols_needed"]), 2),
                 round(np.mean(range_data[range_mean]["latency_sec"]), 6),
                 round(np.mean(range_data[range_mean]["throughput_Mbps"]), 2),
-                round(np.mean(range_data[range_mean]["effective_rate"]), 4)
+                round(np.mean(range_data[range_mean]["effective_rate"]), 4),
+                max(set(range_data[range_mean]["resolution"]), key=range_data[range_mean]["resolution"].count)
             ]
             writer.writerow(row)
             print(f"Range {range_mean}m → Samples: {len(range_data[range_mean]['latency_sec'])}")
