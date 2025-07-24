@@ -100,7 +100,7 @@ def generate_manhattan_grid_trace(start_position, grid_size, cell_size, time_ste
         direction = select_random_direction(*current_index)
 
 
-def simulate_frame_transmission(frame_data, trace, symbols_per_step):
+def simulate_frame_transmission(frame_data, mobility_gen, symbols_per_step):
     symbol_generator = lt_encoder(io.BytesIO(frame_data), block_size)
     decoder = LtDecoder()
     symbols_sent = 0
@@ -112,11 +112,10 @@ def simulate_frame_transmission(frame_data, trace, symbols_per_step):
 
     start_time = time.time()
 
-    for pos_index, position in enumerate(trace):
+    while not decoder.is_done():
+        position = next(mobility_gen)
         print("current position:", position)
         update_uav_on_canvas(*position)
-        if decoder.is_done():
-            break
         distance = compute_distance(position, receiver_position)
         distances.append(distance)
         loss_prob = loss_rate(distance)
@@ -141,9 +140,9 @@ def simulate_frame_transmission(frame_data, trace, symbols_per_step):
 
     if decoder.is_done():
         print("position after decoding:", position)
-        return decoder.bytes_dump(), symbols_sent, latency, avg_distance, effective_rate, position
+        return decoder.bytes_dump(), symbols_sent, latency, avg_distance, effective_rate
     else:
-        return None, symbols_sent, latency, avg_distance, effective_rate, trace[-1]
+        return None, symbols_sent, latency, avg_distance, effective_rate
 
 def run_video_simulation(range_data):
     resolutions = ['144p', '360p', '480p', '720p']
@@ -204,16 +203,7 @@ def run_video_simulation(range_data):
         symbols_per_sec = bits_per_sec / bits_per_symbol
         symbols_per_step = max(1, int(symbols_per_sec * simulation_time_step))
 
-        K = len(frame_bytes) // block_size + 1
-        max_symbols = int(4.0 * K)
-        max_trace_steps = max_symbols // symbols_per_step + 1
-        trace = []
-        for _ in range(max_trace_steps):
-            position = next(mobility_gen)
-            trace.append(position)
-
-        decoded_data, symbols, latency, avg_distance, eff_rate, current_position = simulate_frame_transmission(
-            frame_bytes, trace, symbols_per_step)
+        decoded_data, symbols, latency, avg_distance, eff_rate = simulate_frame_transmission(frame_bytes, mobility_gen, symbols_per_step)
 
         latency = max(latency, 1e-6)
         throughput = (len(frame_bytes) * 8) / (latency * 1_000_000)
