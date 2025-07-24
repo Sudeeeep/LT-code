@@ -28,6 +28,8 @@ simulation_time_step = 0.1
 uav_speed = 5               
 trials = 20         
 bitrate_Mbps = 6
+grid_size = 5
+cell_size = 100
 
 window = tk.Tk()
 window.title("UAV Simulation")
@@ -46,6 +48,10 @@ def update_uav_on_canvas(x, y):
 
     canvas.update()
 
+for i in range(grid_size):
+    x = i * cell_size
+    canvas.create_line(x, 0, x, trace_area[1], fill="lightgray")
+    canvas.create_line(0, x, trace_area[0], x, fill="lightgray")
 
 def compute_distance(pos1, pos2):
     x1, y1 = pos1
