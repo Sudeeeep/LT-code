@@ -5,12 +5,10 @@ import csv
 import random
 import numpy as np
 import io
-from pymobility.models.mobility import random_waypoint
 from lt.encode import encoder as lt_encoder
 from lt.decode import LtDecoder, block_from_bytes
 import tkinter as tk
 from collections import defaultdict
-import av
 from encode_video import encode_multiple_res_video
 
 
@@ -63,28 +61,43 @@ def loss_rate(distance, max_range=500):
         return 0.98
     return min(0.1 + 0.002 * distance, 0.9)
 
-def generate_interpolated_trace(model, start_position, max_steps, time_step, speed_mps):
-    trace = []
-    current_pos = start_position
-    while len(trace) < max_steps:
-        target_pos = next(model)[0]
-        dx = target_pos[0] - current_pos[0]
-        dy = target_pos[1] - current_pos[1]
-        distance = compute_distance(current_pos, target_pos)
+def generate_manhattan_grid_trace(start_position, grid_size, cell_size, time_step, speed_mps):
+    x, y = int(start_position[0] // cell_size), int(start_position[1] // cell_size)
+    current_index = (x, y)
+
+    def select_random_direction(x, y):
+        directions = []
+        if x < (grid_size - 1): 
+            directions.append((1, 0))
+        if x > 0: 
+            directions.append((-1, 0))
+        if y < (grid_size - 1): 
+            directions.append((0, 1))
+        if y > 0: 
+            directions.append((0, -1))
+        return random.choice(directions)
+
+    direction = select_random_direction(*current_index)
+
+    while True:
+        next_index = (current_index[0] + direction[0], current_index[1] + direction[1])
+        start_pos = (current_index[0] * cell_size, current_index[1] * cell_size)
+        end_pos = (next_index[0] * cell_size, next_index[1] * cell_size)
+
+        dx = end_pos[0] - start_pos[0]
+        dy = end_pos[1] - start_pos[1]
+        distance = (dx**2 + dy**2) ** 0.5
         travel_time = distance / speed_mps
         steps = max(1, int(travel_time / time_step))
 
         for step in range(steps):
-            if len(trace) >= max_steps:
-                break
             alpha = step / steps
-            x = current_pos[0] + alpha * dx
-            y = current_pos[1] + alpha * dy
-            trace.append((x, y))
+            x = start_pos[0] + alpha * dx
+            y = start_pos[1] + alpha * dy
+            yield (x, y)
 
-        current_pos = target_pos
-
-    return trace
+        current_index = next_index
+        direction = select_random_direction(*current_index)
 
 
 def simulate_frame_transmission(frame_data, trace, symbols_per_step):
@@ -152,8 +165,10 @@ def run_video_simulation(range_data):
     out = None
     prev_output_size = None
     frame_count = 0
-    model = random_waypoint(nr_nodes=1, dimensions=trace_area, velocity=velocity)
-    current_position = next(model)[0]
+    x = random.randint(0, grid_size - 1)
+    y = random.randint(0, grid_size - 1)
+    initial_position = (x * cell_size, y * cell_size)
+    mobility_gen = generate_manhattan_grid_trace(initial_position, grid_size, cell_size, simulation_time_step, uav_speed)
     quality_index = 0
 
     while True:
@@ -192,7 +207,10 @@ def run_video_simulation(range_data):
         K = len(frame_bytes) // block_size + 1
         max_symbols = int(4.0 * K)
         max_trace_steps = max_symbols // symbols_per_step + 1
-        trace = generate_interpolated_trace(model, current_position, max_trace_steps, simulation_time_step, uav_speed)
+        trace = []
+        for _ in range(max_trace_steps):
+            position = next(mobility_gen)
+            trace.append(position)
 
         decoded_data, symbols, latency, avg_distance, eff_rate, current_position = simulate_frame_transmission(
             frame_bytes, trace, symbols_per_step)
