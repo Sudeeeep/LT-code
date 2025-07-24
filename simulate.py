@@ -28,6 +28,7 @@ trials = 20
 bitrate_Mbps = 6
 grid_size = 5
 cell_size = 100
+uav_altitude = 100
 
 window = tk.Tk()
 window.title("UAV Simulation")
@@ -54,7 +55,7 @@ for i in range(grid_size):
 def compute_distance(pos1, pos2):
     x1, y1 = pos1
     x2, y2 = pos2
-    return ((x1 - x2)**2 + (y1 - y2)**2) ** 0.5
+    return ((x1 - x2)**2 + (y1 - y2)**2 + (uav_altitude)**2) ** 0.5
 
 def loss_rate(distance, max_range=500):
     if distance >= max_range:
