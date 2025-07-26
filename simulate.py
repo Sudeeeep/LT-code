@@ -10,7 +10,6 @@ from lt.encode import encoder as lt_encoder
 from lt.decode import LtDecoder, block_from_bytes
 import tkinter as tk
 from collections import defaultdict
-import av
 from encode_video import encode_multiple_res_video
 
 
@@ -28,6 +27,7 @@ simulation_time_step = 0.1
 uav_speed = 5               
 trials = 20         
 bitrate_Mbps = 6
+uav_altitude = 100
 
 window = tk.Tk()
 window.title("UAV Simulation")
@@ -50,7 +50,7 @@ def update_uav_on_canvas(x, y):
 def compute_distance(pos1, pos2):
     x1, y1 = pos1
     x2, y2 = pos2
-    return ((x1 - x2)**2 + (y1 - y2)**2) ** 0.5
+    return ((x1 - x2)**2 + (y1 - y2)**2 + (uav_altitude)**2) ** 0.5
 
 def loss_rate(distance, max_range=500):
     if distance >= max_range:
