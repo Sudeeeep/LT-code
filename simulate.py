@@ -5,6 +5,7 @@ import csv
 import random
 import numpy as np
 import io
+import math
 from pymobility.models.mobility import random_waypoint
 from lt.encode import encoder as lt_encoder
 from lt.decode import LtDecoder, block_from_bytes
@@ -51,7 +52,7 @@ def update_uav_on_canvas(x, y):
 def compute_distance(pos1, pos2):
     x1, y1 = pos1
     x2, y2 = pos2
-    return ((x1 - x2)**2 + (y1 - y2)**2 + (uav_altitude)**2) ** 0.5
+    return math.sqrt((x1 - x2)**2 + (y1 - y2)**2 + (uav_altitude - receiver_height)**2)
 
 def loss_rate(distance, max_range=500):
     if distance >= max_range:
