@@ -28,6 +28,7 @@ uav_speed = 5
 trials = 20         
 bitrate_Mbps = 6
 uav_altitude = 100
+receiver_height = 25
 
 window = tk.Tk()
 window.title("UAV Simulation")
