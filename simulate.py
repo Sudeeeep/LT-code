@@ -70,10 +70,29 @@ def los_probability(horizontal_distance):
         return 1.0
     return (18/horizontal_distance) + (1 - (18/horizontal_distance)) * math.exp(-horizontal_distance/63)
 
-def loss_rate(distance, max_range=500):
+def loss_rate(distance, horizontal_distance, max_range=500):
+    los_prob = los_probability(horizontal_distance)
+
+    is_los = random.random() < los_prob
+
+    if is_los:
+        path_loss = path_loss_LOS(distance)
+    else:
+        path_loss = path_loss_NLOS(distance, receiver_height)
+
+    path_loss_min = 60
+    path_loss_max = 140
+    
+    if path_loss <= path_loss_min:
+        loss_prob = 0
+    elif path_loss >= path_loss_max:
+        loss_prob = 1
+    else:
+        loss_prob = (path_loss - path_loss_min) / (path_loss_max - path_loss_min)
+
     if distance >= max_range:
         return 0.98
-    return min(0.1 + 0.002 * distance, 0.9)
+    return loss_prob
 
 def generate_interpolated_trace(model, start_position, max_steps, time_step, speed_mps):
     trace = []
@@ -117,8 +136,9 @@ def simulate_frame_transmission(frame_data, trace, symbols_per_step):
         if decoder.is_done():
             break
         distance = compute_distance(position, receiver_position)
+        horizontal_distance = compute_horizontal_distance(position, receiver_position)
         distances.append(distance)
-        loss_prob = loss_rate(distance)
+        loss_prob = loss_rate(distance, horizontal_distance)
 
         for _ in range(symbols_per_step):
             if decoder.is_done():
