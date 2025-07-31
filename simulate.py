@@ -54,6 +54,22 @@ def compute_distance(pos1, pos2):
     x2, y2 = pos2
     return math.sqrt((x1 - x2)**2 + (y1 - y2)**2 + (uav_altitude - receiver_height)**2)
 
+def compute_horizontal_distance(pos1, pos2):
+    x1, y1 = pos1
+    x2, y2 = pos2
+    return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+
+def path_loss_LOS(distance, freq_GHz=2.0):
+    return 28 + 22 * math.log10(distance) + 20 * math.log10(freq_GHz)
+
+def path_loss_NLOS(distance, receiver_height, freq_GHz=2.0):
+    return -17.5 + (46 - 7 * math.log10(receiver_height)) * math.log10(distance) + 20 * math.log10((40 * math.pi * freq_GHz) / 3)
+
+def los_probability(horizontal_distance):
+    if (horizontal_distance < 18):
+        return 1.0
+    return (18/horizontal_distance) + (1 - (18/horizontal_distance)) * math.exp(-horizontal_distance/63)
+
 def loss_rate(distance, max_range=500):
     if distance >= max_range:
         return 0.98
