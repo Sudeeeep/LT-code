@@ -59,16 +59,27 @@ def compute_horizontal_distance(pos1, pos2):
     x2, y2 = pos2
     return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
-def path_loss_LOS(distance, freq_GHz=2.0):
-    return 28 + 22 * math.log10(distance) + 20 * math.log10(freq_GHz)
+def path_loss_LOS(distance, freq_GHz, scenario):
+    if(scenario == "UMa"):
+        return 28 + 22 * math.log10(distance) + 20 * math.log10(freq_GHz)
+    if(scenario == "InF"):
+        return 31.84 + 21.5 * math.log10(distance) + 19 * math.log10(freq_GHz)
 
-def path_loss_NLOS(distance, receiver_height, freq_GHz=2.0):
-    return -17.5 + (46 - 7 * math.log10(receiver_height)) * math.log10(distance) + 20 * math.log10((40 * math.pi * freq_GHz) / 3)
+def path_loss_NLOS(distance, receiver_height, freq_GHz, scenario):
+    if(scenario == "UMa"):
+        return -17.5 + (46 - 7 * math.log10(receiver_height)) * math.log10(distance) + 20 * math.log10((40 * math.pi * freq_GHz) / 3)
+    if(scenario == "InF"):
+        return 18.6 + 35.7 * math.log10(distance) + 20 * math.log10(freq_GHz)
 
-def los_probability(horizontal_distance):
-    if (horizontal_distance < 18):
-        return 1.0
-    return (18/horizontal_distance) + (1 - (18/horizontal_distance)) * math.exp(-horizontal_distance/63)
+def los_probability(horizontal_distance, scenario):
+    if(scenario == "UMa"):
+        if (horizontal_distance < 18):
+            return 1.0
+        return (18/horizontal_distance) + (1 - (18/horizontal_distance)) * math.exp(-horizontal_distance/63)
+    
+    if(scenario == "InF"):
+        k_subsce = 2 / math.log(1 / (1 - 0.5)) 
+        return math.exp(-horizontal_distance/ k_subsce)
 
 def loss_rate(distance, horizontal_distance, max_range=500):
     los_prob = los_probability(horizontal_distance)
