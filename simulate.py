@@ -81,29 +81,37 @@ def los_probability(horizontal_distance, scenario):
         k_subsce = 2 / math.log(1 / (1 - 0.5)) 
         return math.exp(-horizontal_distance/ k_subsce)
 
-def loss_rate(distance, horizontal_distance, max_range=500):
-    los_prob = los_probability(horizontal_distance)
+def loss_rate(distance, horizontal_distance, freq_GHz, scenario):
+
+    los_prob = los_probability(horizontal_distance, scenario)
 
     is_los = random.random() < los_prob
 
     if is_los:
-        path_loss = path_loss_LOS(distance)
+        path_loss = path_loss_LOS(distance, freq_GHz, scenario)
     else:
-        path_loss = path_loss_NLOS(distance, receiver_height)
+        path_loss = path_loss_NLOS(distance, receiver_height, freq_GHz, scenario)
 
-    path_loss_min = 60
-    path_loss_max = 140
+    transmit_power = 23
+    transmit_antenna_gain = 0
+    receive_antenna_gain = 1
+    N0 = 10 ** -20
+    if (freq_GHz == 2): bandwidth = 10 * (10**6)
+    if (freq_GHz == 5.9): bandwidth = 20 * (10**6)
+    if (freq_GHz == 30): bandwidth = 100 * (10**6)
+
+    received_power = transmit_power - path_loss + transmit_antenna_gain + receive_antenna_gain
+    received_power_watts = (10 ** (received_power/10)) * (10 ** -3)
     
-    if path_loss <= path_loss_min:
-        loss_prob = 0
-    elif path_loss >= path_loss_max:
-        loss_prob = 1
-    else:
-        loss_prob = (path_loss - path_loss_min) / (path_loss_max - path_loss_min)
+    total_noise_power = N0 * bandwidth
+    linear_SNR = received_power_watts/total_noise_power
 
-    if distance >= max_range:
-        return 0.98
-    return loss_prob
+    BER = 0.5 * math.exp(-0.6 * linear_SNR)
+
+    L = block_size * 8
+    loss_rate = 1 - ((1 - BER) ** L)
+
+    return loss_rate
 
 def generate_interpolated_trace(model, start_position, max_steps, time_step, speed_mps):
     trace = []
