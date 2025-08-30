@@ -241,9 +241,9 @@ def simulate_frame_transmission(frame_data, trace, symbols_per_step, receiver_po
     plr_emp = 1.0 - (symbols_received / max(1, symbols_sent))
 
     if decoder.is_done():
-        return decoder.bytes_dump(), symbols_sent, latency, avg_distance, effective_rate, position, snr_avg, ber_avg, loss_avg, snr_avg_dB, plr_emp, symbols_received
+        return decoder.bytes_dump(), symbols_sent, latency, avg_distance, effective_rate, position, ber_avg, loss_avg, snr_avg_dB, plr_emp
     else:
-        return None, symbols_sent, latency, avg_distance, effective_rate, trace[-1], snr_avg, ber_avg, loss_avg, snr_avg_dB, plr_emp, symbols_received
+        return None, symbols_sent, latency, avg_distance, effective_rate, trace[-1], ber_avg, loss_avg, snr_avg_dB, plr_emp
 
 def run_video_simulation(range_data, sim_cfg):
     resolutions = ['144p', '360p', '480p', '720p']
