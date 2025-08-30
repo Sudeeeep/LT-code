@@ -469,7 +469,7 @@ if __name__ == "__main__":
         w = csv.writer(f)
         
         w.writerow([
-            "frame_id","scenario","condition","freq_GHz","uav_alt_m",
+            "frame_id","scenario","condition","freq_GHz","uav_altitude_m",
             "range_mean","avg_SNR_dB","avg_BER","avg_loss_prob",
             "K","symbols_sent","overhead","latency_sec","decoded","resolution",
             "PER_est","PLR_emp"
